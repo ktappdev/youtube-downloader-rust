@@ -77,7 +77,7 @@ The UI should be clean, modern, and single-window (suggested size: ~800x600).
 ### Phase 1: Project Setup & UI
 - [ ] Initialize new Tauri project (`npm create tauri-app`).
 - [x] Set up Frontend (React/Vue/etc.) with a component library (e.g., Tailwind, Shadcn, or Material UI).
-- [ ] Build the **Main Layout**:
+- [x] Build the **Main Layout**:
     - [ ] Header with settings.
     - [ ] Text Area for input.
     - [ ] Radio buttons for Audio Mode.
