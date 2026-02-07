@@ -126,6 +126,35 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_video_info_serde() {
+        let video_info = VideoInfo {
+            id: "abc123".to_string(),
+            title: "Test Video".to_string(),
+            url: "https://www.youtube.com/watch?v=abc123".to_string(),
+        };
+
+        let serialized = serde_json::to_string(&video_info).unwrap();
+        let deserialized: VideoInfo = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(video_info.id, deserialized.id);
+        assert_eq!(video_info.title, deserialized.title);
+        assert_eq!(video_info.url, deserialized.url);
+    }
+
+    #[test]
+    fn test_video_info_default_values() {
+        let video_info = VideoInfo {
+            id: "test123".to_string(),
+            title: String::new(),
+            url: "https://www.youtube.com/watch?v=test123".to_string(),
+        };
+
+        assert_eq!(video_info.id, "test123");
+        assert!(video_info.title.is_empty());
+        assert!(video_info.url.contains("test123"));
+    }
+
+    #[test]
     fn test_extract_downloaded_filename_mp3() {
         let output = "[ExtractAudio] Destination: /path/to/file.mp3";
         let result = extract_downloaded_filename(output);
@@ -151,5 +180,113 @@ mod tests {
         let output = "Some random output without filename";
         let result = extract_downloaded_filename(output);
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_extract_downloaded_filename_with_spaces() {
+        let output = "[ExtractAudio] Destination: /path/with spaces/My Song Name.mp3";
+        let result = extract_downloaded_filename(output);
+        assert_eq!(
+            result,
+            Some("/path/with spaces/My Song Name.mp3".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_downloaded_filename_with_special_chars() {
+        let output = "[info] /music/Artist_-_Title_(2024).mp3";
+        let result = extract_downloaded_filename(output);
+        assert_eq!(result, Some("/music/Artist_-_Title_(2024).mp3".to_string()));
+    }
+
+    #[test]
+    fn test_extract_downloaded_filename_priority_merger_over_info() {
+        let output = "[Merger] Merging formats into /path/merged.mp3\n[info] /path/original.mp3";
+        let result = extract_downloaded_filename(output);
+        assert_eq!(result, Some("/path/merged.mp3".to_string()));
+    }
+
+    #[test]
+    fn test_search_video_empty_query_returns_error() {
+        let result = search_video("");
+        assert!(result.is_err() || result.unwrap().is_none());
+    }
+
+    #[test]
+    fn test_search_video_whitespace_only_query_returns_error() {
+        let result = search_video("   ");
+        assert!(result.is_err() || result.unwrap().is_none());
+    }
+
+    #[test]
+    fn test_download_stream_invalid_video_id_returns_error() {
+        let temp_dir = std::env::temp_dir();
+        let result = download_stream(
+            "invalid_id_that_does_not_exist_12345",
+            temp_dir.to_str().unwrap(),
+            |_, _| {},
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_download_stream_invalid_path_returns_error() {
+        let result = download_stream(
+            "dQw4w9WgXcQ",
+            "/nonexistent/path/that/does/not/exist",
+            |_, _| {},
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_download_stream_progress_callback() {
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        let called = Arc::new(AtomicBool::new(false));
+        let progress_count = Arc::new(AtomicUsize::new(0));
+        let called_clone = called.clone();
+        let progress_count_clone = progress_count.clone();
+
+        let temp_dir = std::env::temp_dir();
+        let _result = download_stream(
+            "dQw4w9WgXcQ",
+            temp_dir.to_str().unwrap(),
+            move |progress, message| {
+                called_clone.store(true, Ordering::SeqCst);
+                progress_count_clone.fetch_add(1, Ordering::SeqCst);
+                assert!(progress >= 0.0 && progress <= 100.0);
+                assert!(!message.is_empty());
+            },
+        );
+
+        assert!(called.load(Ordering::SeqCst));
+        assert!(progress_count.load(Ordering::SeqCst) > 0);
+    }
+
+    #[test]
+    fn test_video_info_clone() {
+        let video_info = VideoInfo {
+            id: "test123".to_string(),
+            title: "Test".to_string(),
+            url: "https://youtube.com/watch?v=test123".to_string(),
+        };
+        let cloned = video_info.clone();
+        assert_eq!(video_info.id, cloned.id);
+        assert_eq!(video_info.title, cloned.title);
+        assert_eq!(video_info.url, cloned.url);
+    }
+
+    #[test]
+    fn test_video_info_debug_format() {
+        let video_info = VideoInfo {
+            id: "abc".to_string(),
+            title: "Test Video".to_string(),
+            url: "https://youtube.com/watch?v=abc".to_string(),
+        };
+        let debug = format!("{:?}", video_info);
+        assert!(debug.contains("abc"));
+        assert!(debug.contains("Test Video"));
     }
 }
