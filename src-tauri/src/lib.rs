@@ -4,10 +4,10 @@ use serde::{Deserialize, Serialize};
 use tauri::Emitter;
 use tauri_plugin_dialog::DialogExt;
 
-mod youtube_client;
 mod file_processor;
-use crate::youtube_client::{download_stream, search_video, VideoInfo};
+mod youtube_client;
 use crate::file_processor::{clean_filename, convert_to_mp3};
+use crate::youtube_client::{download_stream, search_video, VideoInfo};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
