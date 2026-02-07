@@ -4,8 +4,10 @@ use serde::{Deserialize, Serialize};
 use tauri::Emitter;
 use tauri_plugin_dialog::DialogExt;
 
+mod csv_parser;
 mod file_processor;
 mod youtube_client;
+use crate::csv_parser::{parse_csv_content, validate_csv_headers, CsvImportResult, CsvTrackEntry};
 use crate::file_processor::{clean_filename, convert_to_mp3};
 use crate::youtube_client::{download_stream, search_video, VideoInfo};
 
@@ -132,6 +134,38 @@ async fn convert_to_mp3_command(
         );
         e
     })
+}
+
+#[tauri::command]
+fn parse_csv_command(csv_content: String, audio_mode: AudioMode) -> Result<CsvImportResult, String> {
+    let result = parse_csv_content(&csv_content)?;
+
+    let suffix = match audio_mode {
+        AudioMode::Official => "official audio",
+        AudioMode::Raw => "raw audio",
+        AudioMode::Clean => "clean audio",
+    };
+
+    let mut processed_entries: Vec<CsvTrackEntry> = Vec::new();
+
+    for mut entry in result.tracks {
+        let search_query = format!("{} {}", entry.search_query.trim(), suffix);
+        entry.search_query = search_query;
+        processed_entries.push(entry);
+    }
+
+    Ok(CsvImportResult {
+        tracks: processed_entries,
+        total_count: result.total_count,
+        success_count: result.success_count,
+        error_count: result.error_count,
+        errors: result.errors,
+    })
+}
+
+#[tauri::command]
+fn validate_csv_command(csv_content: String) -> Result<Vec<String>, String> {
+    validate_csv_headers(&csv_content)
 }
 
 #[tauri::command]
@@ -367,7 +401,9 @@ pub fn run() {
             search_video_command,
             download_video_command,
             clean_filename_command,
-            convert_to_mp3_command
+            convert_to_mp3_command,
+            parse_csv_command,
+            validate_csv_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
