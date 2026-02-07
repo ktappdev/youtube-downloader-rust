@@ -77,7 +77,7 @@ pub fn convert_to_mp3(input_path: &str, output_path: &str) -> Result<String, Str
             .map_err(|e| format!("Failed to create output directory: {}", e))?;
     }
 
-    let output = Command::new("ffmpeg")
+    let child = Command::new("ffmpeg")
         .args([
             "-i",
             input_path,
@@ -94,7 +94,7 @@ pub fn convert_to_mp3(input_path: &str, output_path: &str) -> Result<String, Str
         .spawn()
         .map_err(|e| format!("Failed to spawn ffmpeg: {}", e))?;
 
-    let output = output
+    let output = child
         .wait_with_output()
         .map_err(|e| format!("Failed to wait for ffmpeg: {}", e))?;
 
@@ -258,5 +258,19 @@ mod tests {
     fn test_clean_filename_removes_instrumental() {
         let result = clean_filename("Song Name [Instrumental]");
         assert_eq!(result, "Song Name");
+    }
+
+    #[test]
+    fn test_convert_to_mp3_nonexistent_input_file() {
+        let result = convert_to_mp3("/nonexistent/file.mp3", "/output/song.mp3");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Input file does not exist"));
+    }
+
+    #[test]
+    fn test_convert_to_mp3_empty_input_path() {
+        let result = convert_to_mp3("", "/output/song.mp3");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Input file does not exist"));
     }
 }
