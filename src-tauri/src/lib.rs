@@ -7,9 +7,11 @@ use tauri_plugin_dialog::DialogExt;
 mod csv_parser;
 mod file_processor;
 mod youtube_client;
+mod metadata;
 use crate::csv_parser::{parse_csv_content, validate_csv_headers, CsvImportResult, CsvTrackEntry};
 use crate::file_processor::{clean_filename, convert_to_mp3};
 use crate::youtube_client::{download_stream, search_video, VideoInfo};
+use crate::metadata::{tag_mp3, TrackMetadata};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -169,6 +171,30 @@ fn validate_csv_command(csv_content: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+fn tag_mp3_command(
+    file_path: String,
+    title: Option<String>,
+    artist: Option<String>,
+    album: Option<String>,
+    year: Option<String>,
+    genre: Option<String>,
+    track_number: Option<String>,
+) -> Result<(), String> {
+    let metadata = TrackMetadata {
+        title,
+        artist,
+        album,
+        year,
+        genre,
+        track_number,
+        album_artist: None,
+        comment: Some("Downloaded from YouTube".to_string()),
+    };
+
+    tag_mp3(&file_path, metadata)
+}
+
+#[tauri::command]
 fn process_input(input_text: String, audio_mode: AudioMode) -> Result<ProcessInputResult, String> {
     let lines: Vec<&str> = input_text
         .lines()
@@ -215,6 +241,7 @@ fn process_input(input_text: String, audio_mode: AudioMode) -> Result<ProcessInp
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::metadata::parse_title_for_metadata;
 
     #[test]
     fn test_open_folder_with_valid_path() {
@@ -387,6 +414,56 @@ mod tests {
         assert_eq!(result.total_count, 1);
         assert_eq!(result.items[0].video_id, Some("abcdefghijk".to_string()));
     }
+
+use crate::metadata::{tag_mp3, TrackMetadata};
+
+    #[test]
+    fn test_tag_mp3_command_basic() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("test_metadata.mp3");
+
+        std::fs::write(&test_file, b"dummy mp3 content").unwrap();
+
+        let metadata = TrackMetadata {
+            title: Some("Test Song".to_string()),
+            artist: Some("Test Artist".to_string()),
+            album: Some("Test Album".to_string()),
+            year: Some("2024".to_string()),
+            genre: Some("Rock".to_string()),
+            track_number: Some("1".to_string()),
+            album_artist: Some("Various Artists".to_string()),
+            comment: Some("Test comment".to_string()),
+        };
+
+        let result = tag_mp3(test_file.to_str().unwrap(), metadata);
+        assert!(result.is_ok());
+
+        std::fs::remove_file(&test_file).ok();
+    }
+
+    #[test]
+    fn test_tag_mp3_command_nonexistent_file() {
+        let result = tag_mp3(
+            "/nonexistent/path/test.mp3",
+            TrackMetadata::default(),
+        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("File does not exist"));
+    }
+
+    #[test]
+    fn test_parse_title_for_metadata_basic() {
+        let metadata = parse_title_for_metadata("The Beatles - Hey Jude");
+        assert_eq!(metadata.artist, Some("The Beatles".to_string()));
+        assert_eq!(metadata.title, Some("Hey Jude".to_string()));
+    }
+
+    #[test]
+    fn test_parse_title_for_metadata_no_artist() {
+        let metadata = parse_title_for_metadata("Just a Song Title");
+        assert_eq!(metadata.title, Some("Just a Song Title".to_string()));
+        assert!(metadata.artist.is_none());
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -403,7 +480,8 @@ pub fn run() {
             clean_filename_command,
             convert_to_mp3_command,
             parse_csv_command,
-            validate_csv_command
+            validate_csv_command,
+            tag_mp3_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -7,6 +7,10 @@ pub struct VideoInfo {
     pub id: String,
     pub title: String,
     pub url: String,
+    pub thumbnail_url: Option<String>,
+    pub uploader: Option<String>,
+    pub duration_seconds: Option<u64>,
+    pub upload_date: Option<String>,
 }
 
 pub fn search_video(query: &str) -> Result<Option<VideoInfo>, String> {
@@ -44,7 +48,37 @@ pub fn search_video(query: &str) -> Result<Option<VideoInfo>, String> {
             let title = json["title"].as_str().unwrap_or("").to_string();
             let url = format!("https://www.youtube.com/watch?v={}", id);
 
-            return Ok(Some(VideoInfo { id, title, url }));
+            let thumbnail_url = json["thumbnail"]
+                .as_str()
+                .map(|s| s.to_string())
+                .or_else(|| {
+                    json["thumbnails"]
+                        .as_array()
+                        .and_then(|thumbnails| thumbnails.first())
+                        .and_then(|t| t["url"].as_str())
+                        .map(|s| s.to_string())
+                });
+
+            let uploader = json["uploader"]
+                .as_str()
+                .map(|s| s.to_string())
+                .or_else(|| json["uploader_name"].as_str().map(|s| s.to_string()));
+
+            let duration_seconds = json["duration"]
+                .as_u64()
+                .or_else(|| json["duration_seconds"].as_u64());
+
+            let upload_date = json["upload_date"].as_str().map(|s| s.to_string());
+
+            return Ok(Some(VideoInfo {
+                id,
+                title,
+                url,
+                thumbnail_url,
+                uploader,
+                duration_seconds,
+                upload_date,
+            }));
         }
     }
 
@@ -131,6 +165,10 @@ mod tests {
             id: "abc123".to_string(),
             title: "Test Video".to_string(),
             url: "https://www.youtube.com/watch?v=abc123".to_string(),
+            thumbnail_url: Some("https://example.com/thumb.jpg".to_string()),
+            uploader: Some("TestUploader".to_string()),
+            duration_seconds: Some(180),
+            upload_date: Some("2024-01-01".to_string()),
         };
 
         let serialized = serde_json::to_string(&video_info).unwrap();
@@ -139,6 +177,10 @@ mod tests {
         assert_eq!(video_info.id, deserialized.id);
         assert_eq!(video_info.title, deserialized.title);
         assert_eq!(video_info.url, deserialized.url);
+        assert_eq!(video_info.thumbnail_url, deserialized.thumbnail_url);
+        assert_eq!(video_info.uploader, deserialized.uploader);
+        assert_eq!(video_info.duration_seconds, deserialized.duration_seconds);
+        assert_eq!(video_info.upload_date, deserialized.upload_date);
     }
 
     #[test]
@@ -147,11 +189,17 @@ mod tests {
             id: "test123".to_string(),
             title: String::new(),
             url: "https://www.youtube.com/watch?v=test123".to_string(),
+            thumbnail_url: None,
+            uploader: None,
+            duration_seconds: None,
+            upload_date: None,
         };
 
         assert_eq!(video_info.id, "test123");
         assert!(video_info.title.is_empty());
         assert!(video_info.url.contains("test123"));
+        assert!(video_info.thumbnail_url.is_none());
+        assert!(video_info.uploader.is_none());
     }
 
     #[test]
@@ -271,11 +319,19 @@ mod tests {
             id: "test123".to_string(),
             title: "Test".to_string(),
             url: "https://youtube.com/watch?v=test123".to_string(),
+            thumbnail_url: Some("https://example.com/thumb.jpg".to_string()),
+            uploader: Some("TestUploader".to_string()),
+            duration_seconds: Some(200),
+            upload_date: Some("2024-02-01".to_string()),
         };
         let cloned = video_info.clone();
         assert_eq!(video_info.id, cloned.id);
         assert_eq!(video_info.title, cloned.title);
         assert_eq!(video_info.url, cloned.url);
+        assert_eq!(video_info.thumbnail_url, cloned.thumbnail_url);
+        assert_eq!(video_info.uploader, cloned.uploader);
+        assert_eq!(video_info.duration_seconds, cloned.duration_seconds);
+        assert_eq!(video_info.upload_date, cloned.upload_date);
     }
 
     #[test]
@@ -284,6 +340,10 @@ mod tests {
             id: "abc".to_string(),
             title: "Test Video".to_string(),
             url: "https://youtube.com/watch?v=abc".to_string(),
+            thumbnail_url: None,
+            uploader: None,
+            duration_seconds: None,
+            upload_date: None,
         };
         let debug = format!("{:?}", video_info);
         assert!(debug.contains("abc"));
