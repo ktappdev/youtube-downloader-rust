@@ -66,28 +66,52 @@ function DownloadForm() {
         total_count: number;
         url_count: number;
         search_count: number;
-      }>("process_input", { inputText, audioMode });
+      }>("process_input", { inputText, audioMode: audioMode as string });
 
       console.log("Processed input result:", result);
       setItemCount(result.total_count);
       setCurrentItem(0);
       setStatus("Starting download...");
+      setProgress(0);
+
+      const outputPath = downloadPath || "~/Downloads/Youtube/Multi";
 
       for (let i = 0; i < result.items.length; i++) {
         const item = result.items[i];
         setCurrentItem(i + 1);
+        setProgress((i / result.total_count) * 100);
         
-        if (item.input_type === "Url") {
-          setStatus(`Downloading from URL: ${item.original_input}`);
-        } else {
-          setStatus(`Searching: ${item.original_input}`);
+        try {
+          if (item.input_type === "Url" && item.video_id) {
+            setStatus(`Downloading: ${item.original_input}`);
+            await invoke<string>("download_video_command", {
+              videoId: item.video_id,
+              outputPath,
+            });
+          } else if (item.input_type === "SearchQuery") {
+            setStatus(`Searching: ${item.processed_query}`);
+            const videoInfo = await invoke<{ id: string } | null>("search_video_command", {
+              query: item.processed_query,
+            });
+            
+            if (videoInfo && videoInfo.id) {
+              setStatus(`Downloading: ${item.processed_query}`);
+              await invoke<string>("download_video_command", {
+                videoId: videoInfo.id,
+                outputPath,
+              });
+            } else {
+              setStatus(`Not found: ${item.processed_query}`);
+            }
+          }
+        } catch (itemError) {
+          console.error(`Failed to process item ${i + 1}:`, itemError);
+          setStatus(`Error processing: ${item.original_input}`);
         }
-        
-        console.log(`Item ${i + 1} of ${result.total_count}:`, item);
       }
       
-      setStatus("Download complete!");
       setProgress(100);
+      setStatus("Download complete!");
     } catch (error) {
       console.error("Download failed:", error);
       setStatus(`Error: ${error}`);

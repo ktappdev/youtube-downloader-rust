@@ -8,6 +8,7 @@ mod youtube_client;
 use crate::youtube_client::{search_video, download_stream, VideoInfo};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum AudioMode {
     Official,
     Raw,
@@ -290,6 +291,34 @@ mod tests {
         assert_eq!(result.total_count, 0);
         assert_eq!(result.url_count, 0);
         assert_eq!(result.search_count, 0);
+    }
+
+    #[test]
+    fn test_process_input_with_only_whitespace_lines() {
+        let input = "   \n\n   \n\t\n   ";
+        let result = process_input(input.to_string(), AudioMode::Official).unwrap();
+
+        assert_eq!(result.total_count, 0);
+    }
+
+    #[test]
+    fn test_process_input_search_query_with_special_characters() {
+        let input = "Song & Dance\nRock n Roll";
+        let result = process_input(input.to_string(), AudioMode::Clean).unwrap();
+
+        assert_eq!(result.total_count, 2);
+        assert_eq!(result.search_count, 2);
+        assert_eq!(result.items[0].processed_query, "Song & Dance clean audio");
+        assert_eq!(result.items[1].processed_query, "Rock n Roll clean audio");
+    }
+
+    #[test]
+    fn test_process_input_handles_long_video_ids() {
+        let input = "https://www.youtube.com/watch?v=abcdefghijk";
+        let result = process_input(input.to_string(), AudioMode::Official).unwrap();
+
+        assert_eq!(result.total_count, 1);
+        assert_eq!(result.items[0].video_id, Some("abcdefghijk".to_string()));
     }
 }
 
