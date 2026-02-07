@@ -10,42 +10,45 @@ vi.mock("@tauri-apps/api/core", () => ({
 describe("App Component", () => {
   it("renders YouTube Downloader title", () => {
     render(<App />);
-    expect(screen.getAllByText("YouTube Downloader")).toHaveLength(2);
+    expect(screen.getByText("YouTube Downloader")).toBeInTheDocument();
   });
 
-  it("renders URL input field", () => {
+  it("renders download settings section", () => {
     render(<App />);
-    expect(screen.getByPlaceholderText("Enter YouTube URL...")).toBeInTheDocument();
-  });
-
-  it("renders mode selection buttons", () => {
-    render(<App />);
-    expect(screen.getByRole("button", { name: "Audio" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Video" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Playlist" })).toBeInTheDocument();
-  });
-
-  it("renders download path input field", () => {
-    render(<App />);
+    expect(screen.getByText("Download Settings")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Select download path...")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change Path" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Folder" })).toBeInTheDocument();
   });
 
-  it("renders reset button", () => {
+  it("renders input section", () => {
     render(<App />);
-    expect(screen.getByRole("button", { name: "Reset" })).toBeInTheDocument();
+    expect(screen.getByText("Input")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Paste links or song names (one per line)...")).toBeInTheDocument();
   });
 
-  it("updates URL state on input change", () => {
+  it("renders audio mode selector", () => {
     render(<App />);
-    const input = screen.getByPlaceholderText("Enter YouTube URL...");
-    fireEvent.change(input, { target: { value: "https://youtube.com/watch?v=test" } });
-    expect(input).toHaveValue("https://youtube.com/watch?v=test");
+    expect(screen.getByRole("button", { name: "Official Audio" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Raw Audio" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clean Audio" })).toBeInTheDocument();
   });
 
-  it("updates download path state on input change", () => {
+  it("renders action buttons", () => {
     render(<App />);
-    const input = screen.getByPlaceholderText("Select download path...");
-    fireEvent.change(input, { target: { value: "/Users/downloads" } });
-    expect(input).toHaveValue("/Users/downloads");
+    expect(screen.getByRole("button", { name: "Import CSV" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument();
+  });
+
+  it("renders reset all button", () => {
+    render(<App />);
+    expect(screen.getByRole("button", { name: "Reset All" })).toBeInTheDocument();
+  });
+
+  it("updates input text on change", () => {
+    render(<App />);
+    const textarea = screen.getByPlaceholderText("Paste links or song names (one per line)...");
+    fireEvent.change(textarea, { target: { value: "https://youtube.com/watch?v=test\nAnother song" } });
+    expect(textarea).toHaveValue("https://youtube.com/watch?v=test\nAnother song");
   });
 });
