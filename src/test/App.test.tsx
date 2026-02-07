@@ -10,23 +10,42 @@ vi.mock("@tauri-apps/api/core", () => ({
 describe("App Component", () => {
   it("renders YouTube Downloader title", () => {
     render(<App />);
-    expect(screen.getByText("YouTube Downloader")).toBeInTheDocument();
+    expect(screen.getAllByText("YouTube Downloader")).toHaveLength(2);
   });
 
-  it("renders input field", () => {
+  it("renders URL input field", () => {
     render(<App />);
-    expect(screen.getByPlaceholderText("Enter a name...")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Enter YouTube URL...")).toBeInTheDocument();
   });
 
-  it("renders greet button", () => {
+  it("renders mode selection buttons", () => {
     render(<App />);
-    expect(screen.getByRole("button", { name: "Greet" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Audio" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Video" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Playlist" })).toBeInTheDocument();
   });
 
-  it("updates name state on input change", () => {
+  it("renders download path input field", () => {
     render(<App />);
-    const input = screen.getByPlaceholderText("Enter a name...");
-    fireEvent.change(input, { target: { value: "Test User" } });
-    expect(input).toHaveValue("Test User");
+    expect(screen.getByPlaceholderText("Select download path...")).toBeInTheDocument();
+  });
+
+  it("renders reset button", () => {
+    render(<App />);
+    expect(screen.getByRole("button", { name: "Reset" })).toBeInTheDocument();
+  });
+
+  it("updates URL state on input change", () => {
+    render(<App />);
+    const input = screen.getByPlaceholderText("Enter YouTube URL...");
+    fireEvent.change(input, { target: { value: "https://youtube.com/watch?v=test" } });
+    expect(input).toHaveValue("https://youtube.com/watch?v=test");
+  });
+
+  it("updates download path state on input change", () => {
+    render(<App />);
+    const input = screen.getByPlaceholderText("Select download path...");
+    fireEvent.change(input, { target: { value: "/Users/downloads" } });
+    expect(input).toHaveValue("/Users/downloads");
   });
 });
