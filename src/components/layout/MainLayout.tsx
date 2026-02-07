@@ -173,15 +173,16 @@ interface DownloadInputProps {
   onChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  className?: string;
 }
 
-function DownloadInput({ value, onChange, placeholder, disabled }: DownloadInputProps) {
+function DownloadInput({ value, onChange, placeholder, disabled, className }: DownloadInputProps) {
   return (
     <Textarea
       value={value}
       onChange={(e) => onChange(e.currentTarget.value)}
       placeholder={placeholder || "Paste links or song names (one per line)..."}
-      className="min-h-[150px] resize-y font-mono text-sm"
+      className={cn("min-h-[150px] resize-y font-mono text-sm", className)}
       disabled={disabled}
     />
   );
