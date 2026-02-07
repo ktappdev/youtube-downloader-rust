@@ -1,15 +1,16 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import App from "../App";
+import "@testing-library/jest-dom";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
 describe("App Component", () => {
-  it("renders welcome message", () => {
+  it("renders YouTube Downloader title", () => {
     render(<App />);
-    expect(screen.getByText("Welcome to Tauri + React")).toBeInTheDocument();
+    expect(screen.getByText("YouTube Downloader")).toBeInTheDocument();
   });
 
   it("renders input field", () => {
@@ -27,12 +28,5 @@ describe("App Component", () => {
     const input = screen.getByPlaceholderText("Enter a name...");
     fireEvent.change(input, { target: { value: "Test User" } });
     expect(input).toHaveValue("Test User");
-  });
-
-  it("renders logo links", () => {
-    render(<App />);
-    expect(screen.getByAltText("Vite logo")).toBeInTheDocument();
-    expect(screen.getByAltText("Tauri logo")).toBeInTheDocument();
-    expect(screen.getByAltText("React logo")).toBeInTheDocument();
   });
 });
