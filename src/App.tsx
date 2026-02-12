@@ -111,7 +111,6 @@ function SettingsDropdown({
               size="sm" 
               onClick={onDownloadYtdlp} 
               className="flex-1 text-red-400 hover:text-red-300"
-              disabled={ytdlpStatus === 'downloading'}
             >
               <Download className="w-4 h-4 mr-1" />
               Download
