@@ -3,12 +3,36 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 export type DownloadMode = 'audio' | 'video' | 'playlist';
 export type AudioMode = 'official' | 'raw' | 'clean';
 
+export interface CsvTrackMetadata {
+  artist_names?: string;
+  track_name?: string;
+  album_name?: string;
+  artist_genres?: string;
+  album_release_date?: string;
+  bpm_tempo?: string;
+}
+
+export interface CsvTrackEntry {
+  row_number: number;
+  metadata: CsvTrackMetadata;
+  search_query: string;
+}
+
+export interface CsvImportResult {
+  tracks: CsvTrackEntry[];
+  total_count: number;
+  success_count: number;
+  error_count: number;
+  errors: string[];
+}
+
 interface DownloadState {
   url: string;
   mode: DownloadMode;
   audioMode: AudioMode;
   downloadPath: string;
   inputText: string;
+  csvData: CsvImportResult | null;
   progress: number;
   status: string;
   itemCount: number;
@@ -21,6 +45,7 @@ interface DownloadStoreContextType extends DownloadState {
   setAudioMode: (audioMode: AudioMode) => void;
   setDownloadPath: (path: string) => void;
   setInputText: (text: string) => void;
+  setCsvData: (data: CsvImportResult | null) => void;
   setProgress: (progress: number) => void;
   setStatus: (status: string) => void;
   setItemCount: (count: number) => void;
@@ -31,9 +56,10 @@ interface DownloadStoreContextType extends DownloadState {
 const defaultState: DownloadState = {
   url: '',
   mode: 'video',
-  audioMode: 'official',
+  audioMode: 'clean',
   downloadPath: '',
   inputText: '',
+  csvData: null,
   progress: 0,
   status: '',
   itemCount: 0,
@@ -65,6 +91,10 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, inputText }));
   };
 
+  const setCsvData = (csvData: CsvImportResult | null) => {
+    setState(prev => ({ ...prev, csvData }));
+  };
+
   const setProgress = (progress: number) => {
     setState(prev => ({ ...prev, progress }));
   };
@@ -94,6 +124,7 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
         setAudioMode,
         setDownloadPath,
         setInputText,
+        setCsvData,
         setProgress,
         setStatus,
         setItemCount,

@@ -15,9 +15,9 @@ describe("DownloadSettings Component", () => {
     expect(screen.getByRole("button", { name: "Change Path" })).toBeInTheDocument();
   });
 
-  it("renders open folder button", () => {
+  it("renders open button", () => {
     render(<DownloadSettings downloadPath="" onChangePath={() => {}} onOpenFolder={() => {}} />);
-    expect(screen.getByRole("button", { name: "Open Folder" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Open/ })).toBeInTheDocument();
   });
 
   it("calls onChangePath when change path button is clicked", () => {
@@ -27,10 +27,10 @@ describe("DownloadSettings Component", () => {
     expect(handleChangePath).toHaveBeenCalledTimes(1);
   });
 
-  it("calls onOpenFolder when open folder button is clicked", () => {
+  it("calls onOpenFolder when open button is clicked", () => {
     const handleOpenFolder = vi.fn();
     render(<DownloadSettings downloadPath="" onChangePath={() => {}} onOpenFolder={handleOpenFolder} />);
-    fireEvent.click(screen.getByRole("button", { name: "Open Folder" }));
+    fireEvent.click(screen.getByRole("button", { name: /Open/ }));
     expect(handleOpenFolder).toHaveBeenCalledTimes(1);
   });
 
@@ -43,21 +43,22 @@ describe("DownloadSettings Component", () => {
 describe("AudioModeSelector Component", () => {
   it("renders all three audio mode options", () => {
     render(<AudioModeSelector value="official" onChange={() => {}} />);
-    expect(screen.getByRole("button", { name: "Official Audio" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Raw Audio" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Clean Audio" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Official/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Raw/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Clean/ })).toBeInTheDocument();
   });
 
   it("highlights the selected mode", () => {
     render(<AudioModeSelector value="raw" onChange={() => {}} />);
-    const rawButton = screen.getByRole("button", { name: "Raw Audio" });
-    expect(rawButton).toHaveClass("bg-primary");
+    const rawButton = screen.getByRole("button", { name: /Raw/ });
+    // Check for gradient class which indicates selected state
+    expect(rawButton).toHaveClass("bg-gradient-to-r");
   });
 
   it("calls onChange when a mode button is clicked", () => {
     const handleChange = vi.fn();
     render(<AudioModeSelector value="official" onChange={handleChange} />);
-    fireEvent.click(screen.getByRole("button", { name: "Clean Audio" }));
+    fireEvent.click(screen.getByRole("button", { name: /Clean/ }));
     expect(handleChange).toHaveBeenCalledWith("clean");
   });
 
@@ -120,7 +121,8 @@ describe("ProgressIndicator Component", () => {
 
   it("displays item counter", () => {
     render(<ProgressIndicator progress={50} status="Downloading..." currentItem={3} itemCount={10} />);
-    expect(screen.getByText("3 of 10")).toBeInTheDocument();
+    // Updated to match new format "3 / 10"
+    expect(screen.getByText("3 / 10")).toBeInTheDocument();
   });
 
   it("updates progress bar width", () => {
@@ -132,6 +134,6 @@ describe("ProgressIndicator Component", () => {
 
   it("does not show counter when itemCount is 0", () => {
     render(<ProgressIndicator progress={0} status="" currentItem={0} itemCount={0} />);
-    expect(screen.queryByText("0 of 0")).not.toBeInTheDocument();
+    expect(screen.queryByText("0 / 0")).not.toBeInTheDocument();
   });
 });

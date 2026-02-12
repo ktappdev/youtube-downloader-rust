@@ -13,10 +13,10 @@ pub struct VideoInfo {
     pub upload_date: Option<String>,
 }
 
-pub fn search_video(query: &str) -> Result<Option<VideoInfo>, String> {
+pub fn search_video(ytdlp_path: &str, query: &str) -> Result<Option<VideoInfo>, String> {
     let search_query = format!("ytsearch10:{}", query);
 
-    let output = Command::new("yt-dlp")
+    let output = Command::new(ytdlp_path)
         .args([
             "--dump-json",
             "--no-download",
@@ -86,6 +86,7 @@ pub fn search_video(query: &str) -> Result<Option<VideoInfo>, String> {
 }
 
 pub fn download_stream(
+    ytdlp_path: &str,
     video_id: &str,
     output_path: &str,
     on_progress: impl Fn(f64, &str) + Send + 'static,
@@ -95,7 +96,7 @@ pub fn download_stream(
 
     on_progress(0.0, "Starting download...");
 
-    let output = Command::new("yt-dlp")
+    let output = Command::new(ytdlp_path)
         .args([
             "--format",
             "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio",
@@ -256,13 +257,13 @@ mod tests {
 
     #[test]
     fn test_search_video_empty_query_returns_error() {
-        let result = search_video("");
+        let result = search_video("yt-dlp", "");
         assert!(result.is_err() || result.unwrap().is_none());
     }
 
     #[test]
     fn test_search_video_whitespace_only_query_returns_error() {
-        let result = search_video("   ");
+        let result = search_video("yt-dlp", "   ");
         assert!(result.is_err() || result.unwrap().is_none());
     }
 
@@ -270,6 +271,7 @@ mod tests {
     fn test_download_stream_invalid_video_id_returns_error() {
         let temp_dir = std::env::temp_dir();
         let result = download_stream(
+            "yt-dlp",
             "invalid_id_that_does_not_exist_12345",
             temp_dir.to_str().unwrap(),
             |_, _| {},
@@ -280,6 +282,7 @@ mod tests {
     #[test]
     fn test_download_stream_invalid_path_returns_error() {
         let result = download_stream(
+            "yt-dlp",
             "dQw4w9WgXcQ",
             "/nonexistent/path/that/does/not/exist",
             |_, _| {},
@@ -299,6 +302,7 @@ mod tests {
 
         let temp_dir = std::env::temp_dir();
         let _result = download_stream(
+            "yt-dlp",
             "dQw4w9WgXcQ",
             temp_dir.to_str().unwrap(),
             move |progress, message| {

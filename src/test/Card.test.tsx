@@ -39,7 +39,8 @@ describe("Card Component", () => {
         <CardContent>Custom card</CardContent>
       </Card>
     );
-    const card = screen.getByText("Custom card").closest('[class*="rounded-lg"]');
+    // Updated to use rounded-xl which is the new class
+    const card = screen.getByText("Custom card").closest('[class*="rounded-xl"]');
     expect(card).toHaveClass("custom-card");
   });
 });

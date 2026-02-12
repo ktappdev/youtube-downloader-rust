@@ -1,17 +1,21 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tauri_plugin_dialog::DialogExt;
+use std::path::Path;
+use std::fs;
 
 mod csv_parser;
 mod file_processor;
 mod youtube_client;
 mod metadata;
+mod ytdlp_setup;
 use crate::csv_parser::{parse_csv_content, validate_csv_headers, CsvImportResult, CsvTrackEntry};
 use crate::file_processor::{clean_filename, convert_to_mp3};
 use crate::youtube_client::{download_stream, search_video, VideoInfo};
-use crate::metadata::{tag_mp3, TrackMetadata};
+use crate::metadata::{tag_mp3, TrackMetadata, parse_title_for_metadata};
+use crate::ytdlp_setup::{check_ytdlp, download_ytdlp, get_ytdlp_command};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -89,12 +93,13 @@ async fn set_download_path(window: tauri::Window) -> Result<Option<String>, Stri
 
 #[tauri::command]
 fn open_folder(path: String) -> Result<(), String> {
-    open::that(path).map_err(|e| e.to_string())
+    tauri_plugin_opener::reveal_item_in_dir(&path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn search_video_command(query: String) -> Result<Option<VideoInfo>, String> {
-    search_video(&query)
+async fn search_video_command(query: String, app_handle: tauri::AppHandle) -> Result<Option<VideoInfo>, String> {
+    let ytdlp_path = get_ytdlp_command(&app_handle)?;
+    search_video(&ytdlp_path, &query)
 }
 
 #[tauri::command]
@@ -103,8 +108,9 @@ async fn download_video_command(
     output_path: String,
     window: tauri::Window,
 ) -> Result<String, String> {
+    let ytdlp_path = get_ytdlp_command(&window.app_handle())?;
     let window_clone = window.clone();
-    download_stream(&video_id, &output_path, move |progress, message| {
+    download_stream(&ytdlp_path, &video_id, &output_path, move |progress, message| {
         let _ = window_clone.emit(
             "download-progress",
             serde_json::json!({
@@ -113,6 +119,68 @@ async fn download_video_command(
             }),
         );
     })
+}
+
+#[tauri::command]
+async fn process_item(
+    video_id: String,
+    output_path: String,
+    metadata_override: Option<TrackMetadata>,
+    window: tauri::Window,
+) -> Result<String, String> {
+    let ytdlp_path = get_ytdlp_command(&window.app_handle())?;
+    let window_clone = window.clone();
+
+    // 1. Download
+    let downloaded_path = download_stream(&ytdlp_path, &video_id, &output_path, move |progress, message| {
+        let _ = window_clone.emit(
+            "download-progress",
+            serde_json::json!({
+                "progress": progress,
+                "message": message
+            }),
+        );
+    })?;
+
+    // 2. Clean Filename
+    let path = Path::new(&downloaded_path);
+    let file_stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown");
+    
+    // Remove the video ID from the filename if present (e.g. "Title [id]")
+    // Escape the video_id for regex
+    let escaped_id = regex::escape(&video_id);
+    let id_pattern = format!(r"\s*\[{}\]", escaped_id);
+    let regex = Regex::new(&id_pattern).map_err(|e| e.to_string())?;
+    let stem_without_id = regex.replace(file_stem, "");
+    
+    let cleaned_stem = clean_filename(&stem_without_id);
+    let new_filename = format!("{}.mp3", cleaned_stem);
+    let new_path = path.parent().ok_or("Invalid path")?.join(&new_filename);
+    
+    // Rename/Move if different
+    let final_path_str = if new_path != path {
+        fs::rename(&path, &new_path).map_err(|e| format!("Failed to rename file: {}", e))?;
+        new_path.to_str().ok_or("Invalid path")?.to_string()
+    } else {
+        downloaded_path
+    };
+
+    // 3. Tagging
+    let mut final_metadata = metadata_override.unwrap_or_default();
+    
+    // Infer metadata if not provided
+    if final_metadata.title.is_none() {
+         let inferred = parse_title_for_metadata(&cleaned_stem);
+         final_metadata.title = inferred.title;
+         
+         if final_metadata.artist.is_none() {
+             final_metadata.artist = inferred.artist;
+         }
+    }
+
+    tag_mp3(&final_path_str, final_metadata)?;
+
+    Ok(final_path_str)
 }
 
 #[tauri::command]
@@ -136,6 +204,11 @@ async fn convert_to_mp3_command(
         );
         e
     })
+}
+
+#[tauri::command]
+fn read_file_command(path: String) -> Result<String, String> {
+    fs::read_to_string(path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -472,13 +545,17 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            check_ytdlp,
+            download_ytdlp,
             set_download_path,
             open_folder,
             process_input,
             search_video_command,
             download_video_command,
+            process_item,
             clean_filename_command,
             convert_to_mp3_command,
+            read_file_command,
             parse_csv_command,
             validate_csv_command,
             tag_mp3_command

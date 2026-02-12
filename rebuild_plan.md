@@ -87,33 +87,35 @@ The UI should be clean, modern, and single-window (suggested size: ~800x600).
 ### Phase 2: Backend Logic (Rust)
 - [x] **Command:** `set_download_path` & `open_folder` (using Tauri APIs).
 - [x] **Command:** `process_input` (Main entry point).
-    - [ ] Implement Regex to distinguish URL vs. Text.
+    - [x] Implement Regex to distinguish URL vs. Text.
 - [x] **Module:** `youtube_client`.
-    - [ ] Integrate a Rust YouTube library (e.g., `rustube` or execute `yt-dlp` as a sidecar binary).
-    - [ ] Implement `search_video(query)` -> returns Video ID.
-    - [ ] Implement `download_stream(video_id, path)`.
-- [ ] **Module:** `file_processor`.
-    - [ ] Implement `clean_filename(original_name)` logic (port the list of banned strings).
-    - [ ] Implement `convert_to_mp3(input_path, output_path)` (via FFmpeg sidecar or library).
+    - [x] Integrate a Rust YouTube library (e.g., `rustube` or execute `yt-dlp` as a sidecar binary).
+    - [x] Implement `search_video(query)` -> returns Video ID.
+    - [x] Implement `download_stream(video_id, path)`.
+- [x] **Module:** `file_processor`.
+    - [x] Implement `clean_filename(original_name)` logic (port the list of banned strings).
+    - [x] Implement `convert_to_mp3(input_path, output_path)` (via FFmpeg sidecar or library).
+- [x] **Command:** `process_item` (Full Pipeline).
+    - [x] Orchestrate Download -> Clean -> Tag.
 
 ### Phase 3: Advanced Features
-- [ ] **CSV Import Logic:**
-    - [ ] Create a Rust command to parse CSV files.
-    - [ ] Extract metadata fields (Artist, Album, etc.).
-    - [ ] Pass this data to the download pipeline.
-- [ ] **Metadata Tagging:**
-    - [ ] Integrate a crate like `id3` or `lofty` to write tags to the MP3s.
-    - [ ] Logic: Use CSV data if available; otherwise, infer from Video Title.
+- [x] **CSV Import Logic:**
+    - [x] Create a Rust command to parse CSV files.
+    - [x] Extract metadata fields (Artist, Album, etc.).
+    - [x] Pass this data to the download pipeline.
+- [x] **Metadata Tagging:**
+    - [x] Integrate a crate like `id3` or `lofty` to write tags to the MP3s.
+    - [x] Logic: Use CSV data if available; otherwise, infer from Video Title.
 
 ### Phase 4: Threading & Feedback
-- [ ] Ensure downloads run asynchronously (don't freeze UI).
-- [ ] Emit Tauri Events to Frontend:
-    - [ ] `progress_update`: { value: 50, label: "Downloading..." }
-    - [ ] `item_complete`: { success: true, filename: "Song.mp3" }
+- [x] Ensure downloads run asynchronously (don't freeze UI).
+- [x] Emit Tauri Events to Frontend:
+    - [x] `progress_update`: { value: 50, label: "Downloading..." }
+    - [ ] `item_complete`: { success: true, filename: "Song.mp3" } (Handled via sequential loop for now)
     - [ ] `batch_complete`.
 
 ### Phase 5: Distribution
-- [ ] Configure `tauri.conf.json` allowlists (fs, shell, dialog).
+- [x] Configure `tauri.conf.json` allowlists (fs, shell, dialog).
 - [ ] Bundle FFmpeg/yt-dlp binaries if using sidecar approach.
 - [ ] Build & Test on target OS (macOS/Windows).
 

@@ -1,20 +1,29 @@
+import { useState, useEffect } from "react";
 import { Button } from "./components/ui/Button";
-import { Card, CardHeader, CardTitle, CardContent } from "./components/ui/Card";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "./components/ui/Card";
 import { MainLayout, MainLayoutHeader, MainLayoutFooter, DownloadSettings, AudioModeSelector, DownloadInput, ActionButtons, ProgressIndicator } from "./components/layout/MainLayout";
-import { DownloadProvider, useDownloadStore, AudioMode } from "./store/DownloadStore";
+import { DownloadProvider, useDownloadStore, AudioMode, CsvImportResult } from "./store/DownloadStore";
+import { AboutModal } from "./components/AboutModal";
+import { SetupOverlay } from "./components/SetupOverlay";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
+import { FolderOpen, RotateCcw, Info, Heart } from "lucide-react";
+
+type SetupStatus = "checking" | "downloading" | "ready" | "error";
 
 function DownloadForm() {
   const {
     downloadPath,
     audioMode,
     inputText,
+    csvData,
     progress,
     status,
     currentItem,
     itemCount,
     setAudioMode,
     setInputText,
+    setCsvData,
     setDownloadPath,
     setItemCount,
     setCurrentItem,
@@ -40,12 +49,43 @@ function DownloadForm() {
         await invoke("open_folder", { path: downloadPath });
       } catch (error) {
         console.error("Failed to open folder:", error);
+        setStatus(`Failed to open folder: ${error}`);
       }
+    } else {
+      setStatus("No download path selected");
     }
   };
 
-  const handleImportCsv = () => {
-    console.log("Import CSV clicked");
+  const handleImportCsv = async () => {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: 'CSV', extensions: ['csv'] }]
+      });
+
+      if (!selected) {
+        return;
+      }
+
+      const filePath = selected as string;
+      const content = await invoke<string>("read_file_command", { path: filePath });
+      const result = await invoke<CsvImportResult>("parse_csv_command", { 
+        csvContent: content, 
+        audioMode: audioMode as string 
+      });
+
+      if (result && result.success_count > 0) {
+        setCsvData(result);
+        const queries = result.tracks.map(t => t.search_query).join('\n');
+        setInputText(queries);
+        setStatus(`Imported ${result.success_count} tracks from CSV`);
+      } else if (result) {
+        setStatus(`CSV import had ${result.error_count} errors`);
+      }
+    } catch (error) {
+      console.error("Failed to import CSV:", error);
+      setStatus(`CSV import failed: ${error}`);
+    }
   };
 
   const handleDownload = async () => {
@@ -76,37 +116,58 @@ function DownloadForm() {
 
       const outputPath = downloadPath || "~/Downloads/Youtube/Multi";
 
+      // Check if CSV data matches the processed items count for metadata mapping
+      const canUseCsvMetadata = csvData && csvData.tracks.length === result.items.length;
+
       for (let i = 0; i < result.items.length; i++) {
         const item = result.items[i];
         setCurrentItem(i + 1);
         setProgress((i / result.total_count) * 100);
         
+        // Prepare metadata if available
+        let metadataOverride = null;
+        if (canUseCsvMetadata) {
+            const track = csvData.tracks[i];
+            // Verify alignment (optional but safer)
+            if (item.original_input.trim() === track.search_query.trim() || 
+                item.processed_query.includes(track.search_query.trim())) {
+                metadataOverride = {
+                    title: track.metadata.track_name,
+                    artist: track.metadata.artist_names,
+                    album: track.metadata.album_name,
+                    genre: track.metadata.artist_genres,
+                    year: track.metadata.album_release_date,
+                    // BPM/Tempo could be comment or separate field if supported
+                };
+            }
+        }
+
         try {
-          if (item.input_type === "Url" && item.video_id) {
-            setStatus(`Downloading: ${item.original_input}`);
-            await invoke<string>("download_video_command", {
-              videoId: item.video_id,
-              outputPath,
-            });
-          } else if (item.input_type === "SearchQuery") {
+          let videoId = item.video_id;
+
+          if (item.input_type === "SearchQuery" && !videoId) {
             setStatus(`Searching: ${item.processed_query}`);
             const videoInfo = await invoke<{ id: string } | null>("search_video_command", {
               query: item.processed_query,
             });
-            
-            if (videoInfo && videoInfo.id) {
-              setStatus(`Downloading: ${item.processed_query}`);
-              await invoke<string>("download_video_command", {
-                videoId: videoInfo.id,
-                outputPath,
-              });
-            } else {
-              setStatus(`Not found: ${item.processed_query}`);
+            if (videoInfo) {
+                videoId = videoInfo.id;
             }
+          }
+
+          if (videoId) {
+            setStatus(`Processing: ${item.original_input}`);
+            await invoke<string>("process_item", {
+              videoId,
+              outputPath,
+              metadataOverride
+            });
+          } else {
+             setStatus(`Not found: ${item.processed_query}`);
           }
         } catch (itemError) {
           console.error(`Failed to process item ${i + 1}:`, itemError);
-          setStatus(`Error processing: ${item.original_input}`);
+          setStatus(`Error processing: ${item.original_input} - ${itemError}`);
         }
       }
       
@@ -118,11 +179,18 @@ function DownloadForm() {
     }
   };
 
+  const lineCount = inputText.split('\n').filter(line => line.trim()).length;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
+      {/* Download Settings Card */}
       <Card>
         <CardHeader>
-          <CardTitle>Download Settings</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <FolderOpen className="w-5 h-5 text-red-500" />
+            Download Location
+          </CardTitle>
+          <CardDescription>Choose where to save your downloads</CardDescription>
         </CardHeader>
         <CardContent>
           <DownloadSettings
@@ -133,9 +201,13 @@ function DownloadForm() {
         </CardContent>
       </Card>
 
+      {/* Input Card */}
       <Card>
         <CardHeader>
-          <CardTitle>Input</CardTitle>
+          <CardTitle>Download Queue</CardTitle>
+          <CardDescription>
+            Paste YouTube URLs or song names to download
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <DownloadInput
@@ -144,8 +216,15 @@ function DownloadForm() {
             placeholder="Paste links or song names (one per line)..."
           />
 
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium">Search Mode</label>
+          {lineCount > 0 && (
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <Info className="w-4 h-4" />
+              <span>{lineCount} item{lineCount !== 1 ? 's' : ''} in queue</span>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3 pt-2">
+            <label className="text-sm font-medium text-gray-300">Audio Mode</label>
             <AudioModeSelector
               value={audioMode}
               onChange={(mode: AudioMode) => setAudioMode(mode)}
@@ -160,8 +239,9 @@ function DownloadForm() {
         </CardContent>
       </Card>
 
+      {/* Progress Card */}
       {(itemCount > 0 || progress > 0) && (
-        <Card>
+        <Card className="border-red-500/20">
           <CardContent className="pt-6">
             <ProgressIndicator
               progress={progress}
@@ -173,13 +253,22 @@ function DownloadForm() {
         </Card>
       )}
 
-      <div className="text-sm text-muted-foreground">
-        <p>Current settings:</p>
-        <p>Path: {downloadPath || '(default)'}</p>
-        <p>Audio Mode: {audioMode}</p>
-        <p>Lines: {inputText.split('\n').filter(line => line.trim()).length}</p>
-        <Button onClick={reset} variant="outline" size="sm" className="mt-2">
-          Reset All
+      {/* Status Footer */}
+      <div className="flex items-center justify-between p-4 rounded-lg bg-[#1a1a1a] border border-white/5">
+        <div className="flex items-center gap-4 text-sm text-gray-400">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-500">Mode:</span>
+            <span className="text-white capitalize">{audioMode}</span>
+          </div>
+          <div className="w-px h-4 bg-white/10" />
+          <div className="flex items-center gap-2">
+            <span className="text-gray-500">Items:</span>
+            <span className="text-white">{lineCount}</span>
+          </div>
+        </div>
+        <Button onClick={reset} variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+          <RotateCcw className="w-4 h-4 mr-2" />
+          Reset
         </Button>
       </div>
     </div>
@@ -187,19 +276,80 @@ function DownloadForm() {
 }
 
 function App() {
+  const [showAbout, setShowAbout] = useState(false);
+  const [setupStatus, setSetupStatus] = useState<SetupStatus>("checking");
+
+  useEffect(() => {
+    const checkAndDownload = async () => {
+      try {
+        await invoke<string>("check_ytdlp");
+        setSetupStatus("ready");
+      } catch {
+        setSetupStatus("downloading");
+        try {
+          await invoke<string>("download_ytdlp");
+        } catch (error) {
+          console.error("Failed to download yt-dlp:", error);
+          setSetupStatus("error");
+        }
+      }
+    };
+
+    checkAndDownload();
+  }, []);
+
+  const handleRetry = async () => {
+    setSetupStatus("downloading");
+    try {
+      await invoke<string>("download_ytdlp");
+    } catch (error) {
+      console.error("Failed to download yt-dlp:", error);
+      setSetupStatus("error");
+    }
+  };
+
+  const handleSetupComplete = () => {
+    setSetupStatus("ready");
+  };
+
+  if (setupStatus !== "ready") {
+    return (
+      <SetupOverlay 
+        onComplete={handleSetupComplete} 
+        onRetry={handleRetry} 
+      />
+    );
+  }
+
   return (
     <DownloadProvider>
       <MainLayout
         header={
           <MainLayoutHeader
             title="YouTube Downloader"
-            description="Download YouTube videos, audio, or entire playlists"
+            description="Download videos, audio, or playlists"
           />
         }
-        footer={<MainLayoutFooter>YouTube Downloader - Tauri App</MainLayoutFooter>}
+        footer={
+          <MainLayoutFooter>
+            <div className="flex items-center justify-center gap-2 w-full">
+              <span className="text-gray-500">Built with</span>
+              <Heart className="w-4 h-4 text-red-500 fill-red-500" />
+              <span className="text-gray-500">by</span>
+              <button 
+                onClick={() => setShowAbout(true)}
+                className="text-white hover:text-red-400 transition-colors font-medium"
+              >
+                Ken Taylor
+              </button>
+            </div>
+          </MainLayoutFooter>
+        }
       >
         <DownloadForm />
       </MainLayout>
+      
+      <AboutModal isOpen={showAbout} onClose={() => setShowAbout(false)} />
     </DownloadProvider>
   );
 }
