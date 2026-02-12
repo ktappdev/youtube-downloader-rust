@@ -17,7 +17,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
             <Youtube className="w-7 h-7 text-white" />
           </div>
           <div>
-            <ModalTitle>YouTube Downloader</ModalTitle>
+            <ModalTitle>Lyricut YT Downloader</ModalTitle>
             <ModalDescription>Built with Tauri & React</ModalDescription>
           </div>
         </div>

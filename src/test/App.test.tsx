@@ -7,10 +7,14 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(() => Promise.resolve(() => {})),
+}));
+
 describe("App Component", () => {
-  it("renders YouTube Downloader title", () => {
+  it("renders Lyricut YT Downloader title", () => {
     render(<App />);
-    expect(screen.getByText("YouTube Downloader")).toBeInTheDocument();
+    expect(screen.getByText("Lyricut YT Downloader")).toBeInTheDocument();
   });
 
   it("renders download settings section", () => {

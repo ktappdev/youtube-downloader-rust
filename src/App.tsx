@@ -326,7 +326,7 @@ function App() {
       <MainLayout
         header={
           <MainLayoutHeader
-            title="YouTube Downloader"
+            title="Lyricut YT Downloader"
             description="Download videos, audio, or playlists"
           />
         }

@@ -1,4 +1,4 @@
-# YouTube Downloader
+# Lyricut YT Downloader
 
 A modern, cross-platform desktop application for downloading audio from YouTube. Built with speed and simplicity in mind.
 

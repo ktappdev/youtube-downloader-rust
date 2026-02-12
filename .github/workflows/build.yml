@@ -57,7 +57,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'YouTube Downloader ${{ github.ref_name }}'
+          releaseName: 'Lyricut YT Downloader ${{ github.ref_name }}'
           releaseBody: 'See the assets to download this version and install.'
           releaseDraft: true
           prerelease: false
@@ -76,7 +76,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.ref_name }}
-          name: 'YouTube Downloader ${{ github.ref_name }}'
+          name: 'Lyricut YT Downloader ${{ github.ref_name }}'
           body: |
             ## What's Changed
             

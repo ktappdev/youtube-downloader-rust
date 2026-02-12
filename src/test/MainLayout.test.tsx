@@ -34,13 +34,13 @@ describe("MainLayout Component", () => {
   it("renders layout with header, children, and footer", () => {
     render(
       <MainLayout
-        header={<MainLayoutHeader title="YouTube Downloader" description="Download videos easily" />}
+        header={<MainLayoutHeader title="Lyricut YT Downloader" description="Download videos easily" />}
         footer={<MainLayoutFooter>© 2024</MainLayoutFooter>}
       >
         <p>Download content here</p>
       </MainLayout>
     );
-    expect(screen.getByText("YouTube Downloader")).toBeInTheDocument();
+    expect(screen.getByText("Lyricut YT Downloader")).toBeInTheDocument();
     expect(screen.getByText("Download videos easily")).toBeInTheDocument();
     expect(screen.getByText("Download content here")).toBeInTheDocument();
     expect(screen.getByText("© 2024")).toBeInTheDocument();
