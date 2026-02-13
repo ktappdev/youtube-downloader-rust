@@ -5,6 +5,7 @@ import { MainLayout, MainLayoutHeader, MainLayoutFooter, AudioModeSelector, Down
 import { DownloadProvider, useDownloadStore, AudioMode, CsvImportResult } from "./store/DownloadStore";
 import { AboutModal } from "./components/AboutModal";
 import { SetupOverlay } from "./components/SetupOverlay";
+import { FfmpegWarning } from "./components/FfmpegWarning";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { downloadDir } from "@tauri-apps/api/path";
@@ -20,6 +21,10 @@ function SettingsDropdown({
   ytdlpPath,
   onCheckYtdlp,
   onDownloadYtdlp,
+  ffmpegStatus,
+  ffmpegSource,
+  onCheckFfmpeg,
+  onDownloadFfmpeg,
   isOpen,
   onClose 
 }: { 
@@ -30,6 +35,10 @@ function SettingsDropdown({
   ytdlpPath: string;
   onCheckYtdlp: () => void;
   onDownloadYtdlp: () => void;
+  ffmpegStatus: 'detected' | 'missing' | 'checking' | 'downloading';
+  ffmpegSource: string;
+  onCheckFfmpeg: () => void;
+  onDownloadFfmpeg: () => void;
   isOpen: boolean;
   onClose: () => void;
 }) {
@@ -119,6 +128,58 @@ function SettingsDropdown({
         </div>
       </div>
 
+      {/* FFmpeg Status Section */}
+      <div className="p-4 border-b border-white/5 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-400">FFmpeg:</span>
+          <div className="flex items-center gap-2">
+            {ffmpegStatus === 'detected' && (
+              <>
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                <span className="text-sm text-green-500 font-medium">Detected</span>
+              </>
+            )}
+            {ffmpegStatus === 'missing' && (
+              <>
+                <XCircle className="w-4 h-4 text-red-500" />
+                <span className="text-sm text-red-500 font-medium">Missing</span>
+              </>
+            )}
+            {ffmpegStatus === 'checking' && (
+              <span className="text-sm text-gray-400 font-medium">Checking...</span>
+            )}
+            {ffmpegStatus === 'downloading' && (
+              <span className="text-sm text-yellow-500 font-medium">Downloading...</span>
+            )}
+          </div>
+        </div>
+        {ffmpegSource && ffmpegStatus === 'detected' && (
+          <div className="text-xs text-gray-500 break-all">{ffmpegSource}</div>
+        )}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onCheckFfmpeg}
+            className="flex-1"
+            disabled={ffmpegStatus === 'checking' || ffmpegStatus === 'downloading'}
+          >
+            Check
+          </Button>
+          {ffmpegStatus === 'missing' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDownloadFfmpeg}
+              className="flex-1 text-red-400 hover:text-red-300"
+            >
+              <Download className="w-4 h-4 mr-1" />
+              Download
+            </Button>
+          )}
+        </div>
+      </div>
+
       {/* Download Location Section */}
       <div className="p-4 space-y-3">
         <div className="flex items-center gap-2 text-sm font-medium text-white mb-2">
@@ -155,6 +216,10 @@ function HeaderActions({
   ytdlpPath,
   onCheckYtdlp,
   onDownloadYtdlp,
+  ffmpegStatus,
+  ffmpegSource,
+  onCheckFfmpeg,
+  onDownloadFfmpeg,
   onCloseSettings
 }: { 
   audioMode: AudioMode;
@@ -169,6 +234,10 @@ function HeaderActions({
   ytdlpPath: string;
   onCheckYtdlp: () => void;
   onDownloadYtdlp: () => void;
+  ffmpegStatus: 'detected' | 'missing' | 'checking' | 'downloading';
+  ffmpegSource: string;
+  onCheckFfmpeg: () => void;
+  onDownloadFfmpeg: () => void;
   onCloseSettings: () => void;
 }) {
   return (
@@ -205,6 +274,10 @@ function HeaderActions({
           ytdlpPath={ytdlpPath}
           onCheckYtdlp={onCheckYtdlp}
           onDownloadYtdlp={onDownloadYtdlp}
+          ffmpegStatus={ffmpegStatus}
+          ffmpegSource={ffmpegSource}
+          onCheckFfmpeg={onCheckFfmpeg}
+          onDownloadFfmpeg={onDownloadFfmpeg}
           isOpen={settingsOpen}
           onClose={onCloseSettings}
         />
@@ -237,6 +310,8 @@ function DownloadForm() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [ytdlpStatus, setYtdlpStatus] = useState<'detected' | 'missing' | 'checking' | 'downloading'>('checking');
   const [ytdlpPath, setYtdlpPath] = useState('');
+  const [ffmpegStatus, setFfmpegStatus] = useState<'detected' | 'missing' | 'checking' | 'downloading'>('checking');
+  const [ffmpegSource, setFfmpegSource] = useState('');
 
   useEffect(() => {
     const initializeDownloadPath = async () => {
@@ -255,6 +330,7 @@ function DownloadForm() {
 
   useEffect(() => {
     checkYtdlpStatus();
+    checkFfmpegStatus();
   }, []);
 
   const checkYtdlpStatus = async () => {
@@ -267,6 +343,34 @@ function DownloadForm() {
       console.error("yt-dlp not detected:", error);
       setYtdlpPath('');
       setYtdlpStatus('missing');
+    }
+  };
+
+  const checkFfmpegStatus = async () => {
+    setFfmpegStatus('checking');
+    try {
+      const source = await invoke<string>("check_ffmpeg");
+      setFfmpegSource(source);
+      setFfmpegStatus('detected');
+    } catch (error) {
+      console.error("FFmpeg not detected:", error);
+      setFfmpegSource('');
+      setFfmpegStatus('missing');
+    }
+  };
+
+  const handleDownloadFfmpeg = async () => {
+    setFfmpegStatus('downloading');
+    try {
+      const source = await invoke<string>("download_ffmpeg");
+      setFfmpegSource(source);
+      setFfmpegStatus('detected');
+      setStatus('FFmpeg installed successfully');
+    } catch (error) {
+      console.error("Failed to download FFmpeg:", error);
+      setFfmpegSource('');
+      setFfmpegStatus('missing');
+      setStatus(`Failed to download FFmpeg: ${error}`);
     }
   };
 
@@ -509,6 +613,10 @@ function DownloadForm() {
         ytdlpPath={ytdlpPath}
         onCheckYtdlp={checkYtdlpStatus}
         onDownloadYtdlp={handleDownloadYtdlp}
+        ffmpegStatus={ffmpegStatus}
+        ffmpegSource={ffmpegSource}
+        onCheckFfmpeg={checkFfmpegStatus}
+        onDownloadFfmpeg={handleDownloadFfmpeg}
         onCloseSettings={() => setSettingsOpen(false)}
       />
     )
@@ -518,16 +626,30 @@ function DownloadForm() {
 function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [setupStatus, setSetupStatus] = useState<SetupStatus>("checking");
+  const [showFfmpegWarning, setShowFfmpegWarning] = useState(false);
 
   useEffect(() => {
     const checkAndDownload = async () => {
       try {
         await invoke<string>("check_ytdlp");
-        setSetupStatus("ready");
+        try {
+          await invoke<string>("check_ffmpeg");
+          setSetupStatus("ready");
+        } catch {
+          setSetupStatus("ready");
+          setShowFfmpegWarning(true);
+        }
       } catch {
         setSetupStatus("downloading");
         try {
           await invoke<string>("download_ytdlp");
+          try {
+            await invoke<string>("check_ffmpeg");
+            setSetupStatus("ready");
+          } catch {
+            setSetupStatus("ready");
+            setShowFfmpegWarning(true);
+          }
         } catch (error) {
           console.error("Failed to download yt-dlp:", error);
           setSetupStatus("error");
@@ -563,7 +685,10 @@ function App() {
 
   return (
     <DownloadProvider>
-      <AppContent showAbout={showAbout} setShowAbout={setShowAbout} />
+      <>
+        <AppContent showAbout={showAbout} setShowAbout={setShowAbout} />
+        <FfmpegWarning isOpen={showFfmpegWarning} onClose={() => setShowFfmpegWarning(false)} />
+      </>
     </DownloadProvider>
   );
 }

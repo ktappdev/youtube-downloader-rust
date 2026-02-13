@@ -89,6 +89,7 @@ pub fn download_stream(
     ytdlp_path: &str,
     video_id: &str,
     output_path: &str,
+    ffmpeg_location: Option<&str>,
     on_progress: impl Fn(f64, &str) + Send + 'static,
 ) -> Result<String, String> {
     let video_url = format!("https://www.youtube.com/watch?v={}", video_id);
@@ -96,22 +97,28 @@ pub fn download_stream(
 
     on_progress(0.0, "Starting download...");
 
+    let mut args: Vec<String> = vec![
+        "--format".to_string(),
+        "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio".to_string(),
+        "--output".to_string(),
+        output_template,
+        "--extract-audio".to_string(),
+        "--audio-format".to_string(),
+        "mp3".to_string(),
+        "--audio-quality".to_string(),
+        "0".to_string(),
+        "--no-playlist".to_string(),
+        "--no-warnings".to_string(),
+        "--progress".to_string(),
+    ];
+    if let Some(location) = ffmpeg_location {
+        args.push("--ffmpeg-location".to_string());
+        args.push(location.to_string());
+    }
+    args.push(video_url);
+
     let output = Command::new(ytdlp_path)
-        .args([
-            "--format",
-            "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio",
-            "--output",
-            &output_template,
-            "--extract-audio",
-            "--audio-format",
-            "mp3",
-            "--audio-quality",
-            "0",
-            "--no-playlist",
-            "--no-warnings",
-            "--progress",
-            &video_url,
-        ])
+        .args(args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -274,6 +281,7 @@ mod tests {
             "yt-dlp",
             "invalid_id_that_does_not_exist_12345",
             temp_dir.to_str().unwrap(),
+            None,
             |_, _| {},
         );
         assert!(result.is_err());
@@ -285,6 +293,7 @@ mod tests {
             "yt-dlp",
             "dQw4w9WgXcQ",
             "/nonexistent/path/that/does/not/exist",
+            None,
             |_, _| {},
         );
         assert!(result.is_err());
@@ -305,6 +314,7 @@ mod tests {
             "yt-dlp",
             "dQw4w9WgXcQ",
             temp_dir.to_str().unwrap(),
+            None,
             move |progress, message| {
                 called_clone.store(true, Ordering::SeqCst);
                 progress_count_clone.fetch_add(1, Ordering::SeqCst);

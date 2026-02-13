@@ -64,6 +64,14 @@ pub fn clean_filename(original_name: &str) -> String {
 }
 
 pub fn convert_to_mp3(input_path: &str, output_path: &str) -> Result<String, String> {
+    convert_to_mp3_with_ffmpeg("ffmpeg", input_path, output_path)
+}
+
+pub fn convert_to_mp3_with_ffmpeg(
+    ffmpeg_path: &str,
+    input_path: &str,
+    output_path: &str,
+) -> Result<String, String> {
     let input = Path::new(input_path);
     let output = Path::new(output_path);
 
@@ -77,7 +85,7 @@ pub fn convert_to_mp3(input_path: &str, output_path: &str) -> Result<String, Str
             .map_err(|e| format!("Failed to create output directory: {}", e))?;
     }
 
-    let child = Command::new("ffmpeg")
+    let child = Command::new(ffmpeg_path)
         .args([
             "-i",
             input_path,

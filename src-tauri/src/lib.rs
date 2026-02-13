@@ -11,11 +11,13 @@ mod file_processor;
 mod youtube_client;
 mod metadata;
 mod ytdlp_setup;
+mod ffmpeg_setup;
 use crate::csv_parser::{parse_csv_content, validate_csv_headers, CsvImportResult, CsvTrackEntry};
-use crate::file_processor::{clean_filename, convert_to_mp3};
+use crate::file_processor::{clean_filename, convert_to_mp3_with_ffmpeg};
 use crate::youtube_client::{download_stream, search_video, VideoInfo};
 use crate::metadata::{tag_mp3, TrackMetadata, parse_title_for_metadata};
 use crate::ytdlp_setup::{check_ytdlp, download_ytdlp, get_ytdlp_command};
+use crate::ffmpeg_setup::{check_ffmpeg, download_ffmpeg};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -109,8 +111,22 @@ async fn download_video_command(
     window: tauri::Window,
 ) -> Result<String, String> {
     let ytdlp_path = get_ytdlp_command(&window.app_handle())?;
+    let ffmpeg_path = match check_ffmpeg(window.app_handle().clone()) {
+        Ok(p) => p,
+        Err(_) => download_ffmpeg(window.app_handle().clone()).await.map_err(|e| {
+            format!(
+                "FFmpeg is required but couldn't be downloaded: {}. Please install FFmpeg and try again.",
+                e
+            )
+        })?,
+    };
     let window_clone = window.clone();
-    download_stream(&ytdlp_path, &video_id, &output_path, move |progress, message| {
+    download_stream(
+        &ytdlp_path,
+        &video_id,
+        &output_path,
+        Some(&ffmpeg_path),
+        move |progress, message| {
         let _ = window_clone.emit(
             "download-progress",
             serde_json::json!({
@@ -118,7 +134,8 @@ async fn download_video_command(
                 "message": message
             }),
         );
-    })
+    },
+    )
 }
 
 #[tauri::command]
@@ -129,10 +146,24 @@ async fn process_item(
     window: tauri::Window,
 ) -> Result<String, String> {
     let ytdlp_path = get_ytdlp_command(&window.app_handle())?;
+    let ffmpeg_path = match check_ffmpeg(window.app_handle().clone()) {
+        Ok(p) => p,
+        Err(_) => download_ffmpeg(window.app_handle().clone()).await.map_err(|e| {
+            format!(
+                "FFmpeg is required but couldn't be downloaded: {}. Please install FFmpeg and try again.",
+                e
+            )
+        })?,
+    };
     let window_clone = window.clone();
 
     // 1. Download
-    let downloaded_path = download_stream(&ytdlp_path, &video_id, &output_path, move |progress, message| {
+    let downloaded_path = download_stream(
+        &ytdlp_path,
+        &video_id,
+        &output_path,
+        Some(&ffmpeg_path),
+        move |progress, message| {
         let _ = window_clone.emit(
             "download-progress",
             serde_json::json!({
@@ -140,7 +171,8 @@ async fn process_item(
                 "message": message
             }),
         );
-    })?;
+    },
+    )?;
 
     // 2. Clean Filename
     let path = Path::new(&downloaded_path);
@@ -195,7 +227,16 @@ async fn convert_to_mp3_command(
     window: tauri::Window,
 ) -> Result<String, String> {
     let window_clone = window.clone();
-    convert_to_mp3(&input_path, &output_path).map_err(|e| {
+    let ffmpeg_path = match check_ffmpeg(window.app_handle().clone()) {
+        Ok(p) => p,
+        Err(_) => download_ffmpeg(window.app_handle().clone()).await.map_err(|e| {
+            format!(
+                "FFmpeg is required but couldn't be downloaded: {}. Please install FFmpeg and try again.",
+                e
+            )
+        })?,
+    };
+    convert_to_mp3_with_ffmpeg(&ffmpeg_path, &input_path, &output_path).map_err(|e| {
         let _ = window_clone.emit(
             "conversion-error",
             serde_json::json!({
@@ -547,6 +588,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             check_ytdlp,
             download_ytdlp,
+            check_ffmpeg,
+            download_ffmpeg,
             set_download_path,
             open_folder,
             process_input,

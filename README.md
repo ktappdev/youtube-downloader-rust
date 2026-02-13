@@ -20,7 +20,7 @@ A modern, cross-platform desktop application for downloading audio from YouTube.
 
 ### Download from Releases
 
-1. Go to the [Releases](https://github.com/kentaylor yt-downloader-tauri/releases) page
+1. Go to the [Releases](https://github.com/ktappdev/lyricut-yt-downloader/releases) page
 2. Download the appropriate version for your operating system:
    - **macOS**: Download the `.dmg` file
    - **Windows**: Download the `.msi` installer or `.exe` file
@@ -154,7 +154,4 @@ Built with:
 - [React](https://react.dev/) - UI framework
 - [Tailwind CSS](https://tailwindcss.com/) - Styling
 
----
-
 **Note**: This tool is for personal use only. Please respect copyright laws and YouTube's Terms of Service.
-# youtube-downloader-rust
